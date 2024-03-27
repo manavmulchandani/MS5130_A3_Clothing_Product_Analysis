@@ -1,0 +1,175 @@
+---
+title: "MS5130 A3 Clothing_Product_Analysis"
+author: "Manav"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Product analysis using Dataset 1
+
+```{r}
+
+# Loading all the required libraries
+
+library(ggplot2) # For visualization
+library(dplyr) # For data manipulation
+library(tidyr) # For tidying data
+library(stringr) # For string manipulation
+library(readr) # For reading CSV files
+library(tidytext)
+library(plotly)
+library(wordcloud)
+library(quanteda)
+```
+
+```{r}
+
+# Reading the CSV File
+product_catalog <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/myntra_products_catalog.csv")
+
+head(product_catalog)
+nrow(product_catalog)
+
+# Pre-processing data
+product_catalog <- product_catalog %>%
+  # Renaming columns named weirdly
+  rename(PriceINR = `Price (INR)`) %>%
+  # Removing rows with blank entries or NAs in any column
+  ####filter(apply(., 1, function(row) all(row != "" & !is.na(row)))) %>%
+  drop_na() %>%
+  # Trimming leading and trailing whitespaces in all character columns
+  # Adapted from stackoverflow: https://stackoverflow.com/questions/20760547/removing-whitespace-from-a-whole-data-frame-in-r
+  mutate(across(where(is.character), trimws))
+
+head(product_catalog)
+
+
+```
+
+### Analysis 1: Expensive and budget-friendly brands
+
+```{r}
+
+# Calculating the average price for each brand
+brand_prices <- product_catalog %>%
+  group_by(ProductBrand) %>%
+  # Adapted from stackoverflow : https://stackoverflow.com/questions/25759891/dplyr-summarise-each-with-na-rm
+  summarise(AveragePrice = mean(PriceINR, na.rm = TRUE),NumProducts = n()) %>%
+  filter(NumProducts > 10) %>%
+  ungroup() %>%
+  arrange(desc(AveragePrice))
+
+# Identifying the top 3 most expensive brands and cheap brands
+top_expensive_brands <- head(brand_prices, 3)
+
+top_cheap_brands <- tail(brand_prices, 3)
+
+# Displaying the results
+print("Top 3 Most Expensive Brands: ") 
+print(top_expensive_brands)
+
+print("Top 3 Budget Friendly Brands: ")
+print(top_cheap_brands)
+
+
+```
+
+### Analysis 2: Gender wise product distribution
+
+```{r}
+
+# Getting product counts grouped by gender
+gender_counts <- product_catalog %>%
+  group_by(Gender) %>%
+  summarise(Count = n()) %>%
+  ungroup()
+
+# Creating a bar graph for the number of products by gender
+ggplot(gender_counts, aes(x = Gender, y = Count, fill = Gender, label = Count)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  theme_minimal() +
+  labs(title = "Gender wise product distribution",
+       x = "Gender",
+       y = "Number of Products") +
+  scale_fill_brewer(palette = "Set1") +
+  geom_text(position = position_stack(vjust = 0.5))
+
+
+```
+
+### Analysis 3: Color wise products
+
+```{r}
+
+# Getting product counts for each color
+color_counts <- product_catalog %>%
+  group_by(PrimaryColor) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+nrow(color_counts)
+
+# Identifying top 5 colors
+top_colors <- head(color_counts, 5)
+
+
+# Putting the rest of the colors in "Others" category
+others_count <- sum(tail(color_counts, n = nrow(color_counts) - 5)$Count)
+others_row <- data.frame(PrimaryColor = "Others", Count = others_count)
+
+# Combining the top colors with "Others"
+final_data <- rbind(top_colors, others_row)
+
+final_data
+
+# setting color styles manually
+# Adapted from open ai : 'Prompt - Color codes for the below colors'
+named_colors <- c(
+  "Black" = "#808080",  # Lighter grey instead of black
+  "Blue" = "#ADD8E6",   # Light Blue
+  "Red" = "#FF9999",    # Light Red
+  "Green" = "#90EE90",  # Light Green
+  "White" = "#F8F8FF",  # Off-White, Ghost White
+  "Others" = "#D8BFD8"  # Light Purple (Thistle)
+)
+
+# Changing the 'final_data' values as percentage of whole count
+final_data$Percentage <- (final_data$Count / sum(final_data$Count)) * 100
+
+ggplot(final_data, aes(x = "", y = Count, fill = PrimaryColor, label = sprintf("%1.1f%%", Percentage))) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  labs(title = "Color Based Product Distribution") +
+  scale_fill_manual(values = named_colors) +
+  geom_text(position = position_stack(vjust = 0.5))
+
+# blue, black and red are the most popular color categories
+```
+
+## Sentiment and Review analysis using Dataset 2 and 3
+
+```{r}
+
+# Reading the other 2 datasets (Detailed Product dataset and Product Review dataset)
+
+Product_Detailed_2 <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/Product_Detailed_2.csv")
+Product_Reviews_3 <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/Product_Reviews_3.csv")
+
+# Manually creating the mapping based on domain knowledge so that the Categories from both the dataset can be matched to each other
+
+Product_Detailed_2 <- Product_Detailed_2 %>%
+  mutate(Category = case_when(
+    Category == "Inner Wear & Sleep Wear" ~ "Intimate",
+    Category == "Lingerie & Sleep Wear" ~ "Intimate",
+    Category == "Western" ~ "Dresses",
+    Category == "Bottom Wear" ~ "Bottoms",
+    Category == "Topwear" ~ "Tops",
+    Category == "Sports Wear" ~ "Jackets",
+    Category == "Indian Wear" ~ "Trend",
+    TRUE ~ as.character(Category)  # Default case to keep original Category values
+  ))
+```
+
+### 
