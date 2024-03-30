@@ -5,6 +5,7 @@ format: html
 editor: visual
 editor_options: 
   chunk_output_type: console
+toc: true
 ---
 
 ## Product analysis using Dataset 1
@@ -29,7 +30,6 @@ library(quanteda)
 # Reading the CSV File
 product_catalog <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/myntra_products_catalog.csv")
 
-head(product_catalog)
 nrow(product_catalog)
 
 # Pre-processing data
@@ -48,7 +48,7 @@ head(product_catalog)
 
 ```
 
-### Analysis 1: Expensive and budget-friendly brands
+### Expensive and budget-friendly brands
 
 ```{r}
 
@@ -76,7 +76,7 @@ print(top_cheap_brands)
 
 ```
 
-### Analysis 2: Gender wise product distribution
+### Gender wise product distribution
 
 ```{r}
 
@@ -99,7 +99,7 @@ ggplot(gender_counts, aes(x = Gender, y = Count, fill = Gender, label = Count)) 
 
 ```
 
-### Analysis 3: Color wise products
+### Color wise product distribution
 
 ```{r}
 
@@ -172,4 +172,115 @@ Product_Detailed_2 <- Product_Detailed_2 %>%
   ))
 ```
 
-### 
+### Sentiment scores and average ratings
+
+```{r}
+
+# Average rating using Detailed product dataset (Dataset 2)
+
+avg_rating_by_category <- Product_Detailed_2 %>%
+  group_by(Category) %>%
+  summarise(AverageRating = mean(Ratings, na.rm = TRUE)) %>%
+  ungroup()
+
+# Sentiment scores using Product Review dataset (Dataset 3)
+
+sentiment_analysis <- Product_Reviews_3 %>%
+  unnest_tokens(word, 'Review Text') %>%
+  inner_join(get_sentiments("bing"), by = "word", relationship = "many-to-many") %>%
+  group_by(index) %>%
+  summarise(sentiment_score = sum(case_when(
+    sentiment == "positive" ~ 1,
+    sentiment == "negative" ~ -1,
+    TRUE ~ 0L
+  )), .groups = 'drop')
+
+
+# plotting sentiment score histogram
+
+ggplot(sentiment_analysis, aes(x = sentiment_score)) +
+  geom_histogram(bins = 50) +
+  labs(title = "Distribution of Sentiment Scores", x = "Sentiment Score", y = "Count")
+
+
+# Joining the sentiments back to the review dataset
+reviewdataset_with_sentiments <- Product_Reviews_3 %>%
+  left_join(sentiment_analysis, by = "index")
+
+# Grouping by Category for analysis
+avg_sentiments_by_category <- reviewdataset_with_sentiments %>%
+  group_by(Category) %>%
+  summarise(average_sentiment = mean(sentiment_score, na.rm = TRUE)) %>%
+  ungroup()  
+
+# Visualizing sentiment scores across categories
+avg_sentiments_by_category <- na.omit(avg_sentiments_by_category)
+
+p <- plot_ly(data = avg_sentiments_by_category, x = ~Category, y = ~average_sentiment, type = 'bar', marker = list(color = ~average_sentiment, colorscale = 'Viridis'), showlegend = FALSE) %>%
+  layout(title = 'Distribution of Average Sentiment Scores by Category',
+         xaxis = list(title = 'Category'),
+         yaxis = list(title = 'Average Sentiment Score'))
+
+p
+
+```
+
+### Insights using Sentiment score and ratings
+
+```{r}
+
+# Joining the datasets on the 'Category' column and displaying the results
+category_insights <- inner_join(avg_rating_by_category, avg_sentiments_by_category, by = "Category")
+
+final_display <- category_insights %>%
+  select(Category, AverageRating, average_sentiment)
+
+print(final_display)
+
+# The bar chart
+p <- plot_ly(data = final_display, x = ~Category) %>%
+  add_bars(y = ~AverageRating, name = 'Average Rating', marker = list(color = '#ADD8E6')) %>%
+  add_bars(y = ~average_sentiment, name = 'Average Sentiment', marker = list(color = '#FF9999')) %>%
+  layout(yaxis = list(title = 'Score'),
+         barmode = 'group',
+         title = 'Comparison of Average Ratings and Sentiments by Category')
+
+p
+```
+
+The bar chart shows comparison of average ratings and average sentiments across various categories such as "Bottoms," "Dresses," "Intimate," and so on.
+
+**Insights from the chart:**
+
+Consistency: The average ratings and average sentiments are consistent across categories. This suggests that customers’ overall satisfaction levels are similar across different product types. Moreover the balance indicates that sentiment scores derived from reviews correlate well with the numerical ratings customers give. In other words, how customers speak about the product aligns with how they rate it.
+
+Lack of Extremes and positiveness: There are no categories with extreme sentiment or rating scores. The positive ratings and sentiment values also indicate a moderately positive level of customer feeling towards the products in each categories.
+
+### Wordcloud of Category with high sentiment
+
+```{r}
+
+# Filtering the dataset for the category "Tops"
+dresses_reviews <- Product_Reviews_3 %>%
+  filter(Category == "Tops") %>%
+  select('Review Text')
+
+# Creating a text corpus from the vector source of review text
+text_corpus <- corpus(dresses_reviews$'Review Text')
+
+# Preprocessing to remove punctuations, numbers, spaces and common english words like 'the', 'at' since they are not relevant for analysis
+cleaned_corpus <- text_corpus %>%
+  tokens() %>%
+  tokens_tolower() %>%
+  tokens_remove(pattern = "[[:punct:]]") %>%
+  tokens_remove(pattern = "\\d+") %>%
+  tokens_remove(pattern = stopwords("en")) %>%
+  tokens_remove(pattern = "[[:space:]]+")
+
+# Generate the word cloud
+set.seed(1234)
+wordcloud(words = cleaned_corpus, scale = c(3, 0.5), max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+
+```
+
+The word cloud for "tops" highlights key words that stand out in customer reviews. "Love," "like," and "fit" are prominent, indicating these are common sentiments that customers frequently mention. Words like "color," "size," and "fabric" suggest these are important factors for customers when evaluating tops. Overall, this word cloud reflects positive customer experiences.
