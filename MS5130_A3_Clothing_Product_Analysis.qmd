@@ -284,3 +284,137 @@ wordcloud(words = cleaned_corpus, scale = c(3, 0.5), max.words = 100, random.ord
 ```
 
 The word cloud for "tops" highlights key words that stand out in customer reviews. "Love," "like," and "fit" are prominent, indicating these are common sentiments that customers frequently mention. Words like "color," "size," and "fabric" suggest these are important factors for customers when evaluating tops. Overall, this word cloud reflects positive customer experiences.
+
+## Analysis of Brand Average Ratings in Relation to Pricing and Product Count
+
+```{r}
+
+# Aggregating brand data using Dataset 1 - product_catalog
+
+agg_product_data <- product_catalog %>%
+  group_by(ProductBrand) %>%
+  filter(n() > 50) %>%
+  summarise(
+    AvgPrice1 = mean(PriceINR, na.rm = TRUE),
+    ProductCount = n()
+  ) %>%
+  ungroup()
+
+# Aggregating brand data using Dataset 2 - Product_Detailed_2
+
+agg_detailed_data <- Product_Detailed_2 %>%
+  group_by(BrandName) %>%
+  filter(n() > 50) %>%
+  summarise(
+    AvgPrice2 = mean(`OriginalPrice (in Rs)`, na.rm = TRUE),
+    AvgRating = mean(Ratings, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+combined_data <- merge(agg_product_data, agg_detailed_data, 
+                       by.x = "ProductBrand", by.y = "BrandName")
+
+head(combined_data)
+
+# Building and summarizing a glm model
+
+glm_model <- glm(AvgRating ~ AvgPrice1 + ProductCount, family = gaussian(), data = combined_data)
+
+summary(glm_model)
+
+```
+
+A Generalized Linear Model (GLM) explores the relationships between the average price and the product count on the average rating for brands with more than 50 products.
+
+The GLM analysis, focusing on the average price and the product count as predictors of average rating, reveals that neither average price nor product count significantly affects the average ratings in a statistically meaningful way.
+
+```{r}
+
+# Adding predicted ratings
+combined_data$predicted_ratings <- predict(glm_model, type = "response")
+
+# Ploting the ratings data
+ggplot(combined_data, aes(x = AvgRating, y = predicted_ratings)) +
+  geom_point(aes(color = "Actual vs. Predicted"), alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs. Predicted Ratings",
+       x = "Actual Ratings",
+       y = "Predicted Ratings") +
+  theme_minimal() +
+  scale_color_manual(values = c("Actual vs. Predicted" = "blue"))
+
+
+```
+
+While the statistical model did not reveal significant predictors for average ratings, the visualization of actual versus predicted ratings is presented here to show the model's power.
+
+We can see that most points are clustered around the line, but there is a spread, indicating some variance between the predicted and actual ratings.
+
+## Average price changes over time
+
+We are using Top 5 categories from the 'brand_prices' variable generated in 'Expensive and budget-friendly brands' section that uses **product dataset (dataset 1)** that has products from **2015** and also generating top 5 brands from the detailed dataset **(dataset 2)** that has products from **2020** for brands that have more than 10 products and then comparing the prices over time.
+
+```{r}
+
+# Aggregating brand data using Dataset 1 - product_catalog
+top5_expensive_brands_2015 <- head(brand_prices, 5) %>%
+  mutate(Year = "2015") %>%
+  select(Brand = ProductBrand, AvgPrice=AveragePrice, Year)
+
+# Aggregating brand data using Dataset 2 - Product_Detailed_2
+
+top5_expensive_brands_2020 <- Product_Detailed_2 %>%
+  group_by(BrandName) %>%
+  filter(n() > 10) %>%
+  summarise(
+    AvgPrice = mean(`OriginalPrice (in Rs)`, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  mutate(Year = "2020") %>%
+  arrange(desc(AvgPrice)) %>%
+  head(5) %>%
+  select(Brand = BrandName, AvgPrice, Year)
+
+
+# Binding the two while keeping the year distinction
+top_brands_combined <- bind_rows(top5_expensive_brands_2015, top5_expensive_brands_2020)
+
+top_brands_combined
+
+
+# Arranging the dataframe by AvgPrice in descending order
+
+top_brands_combined <- top_brands_combined %>%
+  mutate(Brand = factor(Brand, levels = unique(Brand[order(-AvgPrice)])))
+
+# Creating the plot and also displaying top 5 expensive brands from 2015 and 2020
+
+# We will first create two separate data frames for each year
+df_2015 <- top_brands_combined %>% filter(Year == "2015")
+df_2020 <- top_brands_combined %>% filter(Year == "2020")
+
+print("Top 5 Expensive brands 2015:") 
+df_2015
+
+print("Top 5 Expensive brands 2020:")
+df_2020
+
+# Creating the bar chart for 2015
+p1 <- plot_ly(data = df_2015, x = ~Brand, y = ~AvgPrice, type = 'bar', name = '2015',
+              marker = list(color = 'coral')) %>%
+  layout(yaxis = list(title = 'Average Price 2015 (INR)'))
+
+# Creating the bar chart for 2020
+p2 <- plot_ly(data = df_2020, x = ~Brand, y = ~AvgPrice, type = 'bar', name = '2020',
+              marker = list(color = 'seagreen')) %>%
+  layout(yaxis = list(title = 'Average Price 2020 (INR)'),
+         xaxis = list(title = 'Brand'))
+
+# Combining the two plots into one with two subplots
+# Note: shareX = TRUE means that all subplots will share the same x-axis.
+subplot(p1, p2, nrows = 2, shareX = TRUE) %>%
+  layout(title = 'Average Prices by Brand for 2015 and 2020')
+
+```
+
+This output shows a side-by-side comparison of average prices for various brands in two different years, 2015 and 2020. The orange bars represent the average prices in 2015, while the green bars represent the prices in 2020. The chart shows that, in general, brands are charging more for their products in 2020 than they did in 2015, prices have gone up in five years. The top brands have also changed like 'Teakwood', 'White Fire', however brands like 'Seiko' continue to dominate the expensive segment.
