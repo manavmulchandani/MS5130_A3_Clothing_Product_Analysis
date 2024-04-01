@@ -19,16 +19,19 @@ library(dplyr) # For data manipulation
 library(tidyr) # For tidying data
 library(stringr) # For string manipulation
 library(readr) # For reading CSV files
-library(tidytext)
+library(tidytext) 
 library(plotly)
 library(wordcloud)
 library(quanteda)
+library(leaflet)
+library(tidygeocoder)
+
 ```
 
 ```{r}
 
 # Reading the CSV File
-product_catalog <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/myntra_products_catalog.csv")
+product_catalog <- read_csv("myntra_products_catalog.csv")
 
 nrow(product_catalog)
 
@@ -154,8 +157,8 @@ ggplot(final_data, aes(x = "", y = Count, fill = PrimaryColor, label = sprintf("
 
 # Reading the other 2 datasets (Detailed Product dataset and Product Review dataset)
 
-Product_Detailed_2 <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/Product_Detailed_2.csv")
-Product_Reviews_3 <- read_csv("C:/Users/manav/OneDrive/Desktop/Work/R_Applied_Analytics/Assignment 3/Product_Reviews_3.csv")
+Product_Detailed_2 <- read_csv("Product_Detailed_2.csv")
+Product_Reviews_3 <- read_csv("Product_Reviews_3.csv")
 
 # Manually creating the mapping based on domain knowledge so that the Categories from both the dataset can be matched to each other
 
@@ -225,6 +228,10 @@ p
 
 ```
 
+The histogram shows a normal distribution for the sentiment scores, most scores cluster around the middle, suggesting that most sentiments expressed are neutral. There are fewer very positive or very negative sentiments, as seen by the lower bars at the ends.
+
+This bar chart displays average sentiment scores for different clothing categories. Tops, Dresses, and Jackets seem to have higher average sentiments, indicating more positive feedback, while the 'Trend' category has a noticeably lower average sentiment score.
+
 ### Insights using Sentiment score and ratings
 
 ```{r}
@@ -276,6 +283,7 @@ cleaned_corpus <- text_corpus %>%
   tokens_remove(pattern = "\\d+") %>%
   tokens_remove(pattern = stopwords("en")) %>%
   tokens_remove(pattern = "[[:space:]]+")
+# Adapted from: https://search.r-project.org/CRAN/refmans/quanteda/html/tokens_select.html
 
 # Generate the word cloud
 set.seed(1234)
@@ -389,7 +397,6 @@ top_brands_combined <- top_brands_combined %>%
 
 # Creating the plot and also displaying top 5 expensive brands from 2015 and 2020
 
-# We will first create two separate data frames for each year
 df_2015 <- top_brands_combined %>% filter(Year == "2015")
 df_2020 <- top_brands_combined %>% filter(Year == "2020")
 
@@ -414,7 +421,75 @@ p2 <- plot_ly(data = df_2020, x = ~Brand, y = ~AvgPrice, type = 'bar', name = '2
 # Note: shareX = TRUE means that all subplots will share the same x-axis.
 subplot(p1, p2, nrows = 2, shareX = TRUE) %>%
   layout(title = 'Average Prices by Brand for 2015 and 2020')
+# Adapted from: https://plotly.com/r/subplots/
 
 ```
 
 This output shows a side-by-side comparison of average prices for various brands in two different years, 2015 and 2020. The orange bars represent the average prices in 2015, while the green bars represent the prices in 2020. The chart shows that, in general, brands are charging more for their products in 2020 than they did in 2015, prices have gone up in five years. The top brands have also changed like 'Teakwood', 'White Fire', however brands like 'Seiko' continue to dominate the expensive segment.
+
+## Brand location on world map using leaflet
+
+```{r}
+
+# Loading the dataset that contains brands along with their founding country
+location_of_brands <- read.csv("Location_of_brands.csv")
+
+head(location_of_brands)
+
+# Finding lat and long using OSM geocoding
+geocoded_data <- location_of_brands %>%
+  geocode(country = location, method = 'osm') %>%
+ # Adapted from: https://geocoder.readthedocs.io/providers/OpenStreetMap.html
+  distinct(location, .keep_all = TRUE) %>%
+  select(location,lat,long)
+
+print(geocoded_data)
+
+# Joining the lat and long with the brands with location dataset
+brand_location_geocoded <- inner_join(location_of_brands, geocoded_data, by = "location", relationship = "many-to-many") %>%
+  select (Brands,location,lat,long)
+
+head(brand_location_geocoded)
+
+# Aggregating the data from detailed dataset 2 at brand level
+aggregated_brands <- Product_Detailed_2 %>%
+  group_by(BrandName) %>%
+  summarise(
+    AvgPrice = mean(`OriginalPrice (in Rs)`, na.rm = TRUE),
+    ProductCount = n()
+  ) %>%
+  ungroup() %>%
+  select(Brands = BrandName, AvgPrice, ProductCount)
+
+
+# Using the Brand aggregated dataset and brand geocoded dataset to create a list of top 3 brands for each country and product count for those brands
+
+top_brands_by_country <- aggregated_brands %>%
+  inner_join(brand_location_geocoded, by = "Brands") %>%
+  group_by(location) %>%
+  arrange(desc(AvgPrice)) %>%
+  mutate(Rank = row_number()) %>%
+  filter(Rank <= 3) %>%
+  summarise(
+    TopBrands = paste(Brands, "(", round(AvgPrice, 2), "INR - ", ProductCount, "products)", collapse = "<br>")
+  ) %>%
+  ungroup()
+
+# Joining back with 'geocoded_data' to get latitude and longitude
+country_info <- geocoded_data %>%
+  distinct(location, .keep_all = TRUE) %>%
+  inner_join(top_brands_by_country, by = "location")
+
+print(country_info)
+
+# Creating the world map using leaflet
+leaflet(country_info) %>%
+  addProviderTiles(providers$CartoDB.Voyager) %>%
+  # Adapted from: https://www.kaggle.com/code/devzohaib/interactive-maps-with-leaflet-in-r
+  addCircleMarkers(
+    lng = ~long, lat = ~lat, radius = 8, color = "coral", fillOpacity = 0.8,
+    popup = ~paste0("<strong>", location, "</strong><br><strong>Top 3 Brands:</strong><br>", TopBrands)
+  ) %>%
+  setView(lng = 20, lat = 0, zoom = 2)
+
+```
