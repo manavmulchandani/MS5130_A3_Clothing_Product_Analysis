@@ -23,6 +23,12 @@ The analysis utilizes the following datasets:
 - `Product_Reviews_3.csv`: Customer reviews and sentiments.
 - `Location_of_brands.csv`: Origin locations for various brands.
 
+The datasets are opensource and can be accessed via kaggle except for `Location_of_brands.csv` which is available in the repository. Below are the links for the three datasets.
+
+- `myntra_products_catalog.csv`: https://www.kaggle.com/datasets/shivamb/fashion-clothing-products-catalog
+- `Product_Detailed_2.csv`: https://www.kaggle.com/datasets/manishmathias/myntra-fashion-dataset
+- `Product_Reviews_3.csv`: https://www.kaggle.com/datasets/nicapotato/womens-ecommerce-clothing-reviews
+
 ## Tools and Libraries Used
 
 - **R**: The analysis is conducted entirely in R.

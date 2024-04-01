@@ -492,4 +492,42 @@ leaflet(country_info) %>%
   ) %>%
   setView(lng = 20, lat = 0, zoom = 2)
 
+
+```
+
+## Flowchart of analysis using mermaid
+
+```{mermaid}
+flowchart TB
+    subgraph csv1 ["myntra_products_catalog.csv"]
+    end
+    
+    subgraph csv2 ["Product_Detailed_2.csv"]
+    end
+    
+    subgraph csv3 ["Product_Reviews_3.csv"]
+    end
+    
+    subgraph csv4 ["Location_of_brands.csv"]
+    end
+    
+    csv1 -->|Read| preprocess1[Preprocessing]
+    csv2 -->|Read| preprocess2[Preprocessing]
+    csv3 -->|Read| preprocess3[Preprocessing]
+    csv4 -->|Geocode| preprocess4[Preprocessing]
+    
+    preprocess1 --> analysis1.1[Expensive and Budget-Friendly Brands Analysis]
+    preprocess1 --> analysis1.2[Gender wise product distribution]
+    preprocess1 --> analysis1.3[Color wise product distribution]
+    
+    preprocess1 --> analysis2[Average price changes over time]
+    preprocess2 --> analysis2[Average price changes over time]
+    
+    preprocess2 --> analysis3[Sentiment and Review Analysis]
+    preprocess3 --> analysis3[Sentiment and Review Analysis]
+    
+    analysis2 --> analysis3.1[Wordcloud of top category]
+    
+    preprocess2 --> geo[Top 3 Brands by location on world map]
+    preprocess4 --> geo[Top 3 Brands by location on world map]
 ```
