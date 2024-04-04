@@ -1,11 +1,16 @@
 ---
 title: "MS5130 A3 Clothing_Product_Analysis"
 author: "Manav"
-format: html
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-expand: 2
+    toc-title: Contents
+    toc-depth: 3
 editor: visual
 editor_options: 
   chunk_output_type: console
-toc: true
 ---
 
 ## Product analysis using Dataset 1
