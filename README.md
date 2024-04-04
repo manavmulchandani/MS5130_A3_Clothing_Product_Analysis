@@ -1,4 +1,4 @@
-# MS5130_A3_Clothing_Product_Analysis
+# MS5130 A3 Clothing Product Analysis
 
 This repository contains the R code and analysis for the MS5130 Assignment 3. The assignment is focused on analysing an ecommerce website's clothing products. The analysis utilizes datasets related to clothing products, their brands, pricing, customer reviews, and brand origin locations.
 
